@@ -2,8 +2,11 @@ name: Generate Daily GitHub Activity Report
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # runs every day at midnight UTC
-  workflow_dispatch:        # allows manual trigger from GitHub UI
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-report:
@@ -23,8 +26,14 @@ jobs:
 
       - name: Generate report
         run: |
-          cd src
-          python generate_report.py ${{ github.repository_owner }}
+          mkdir -p reports
+          python src/generate_report.py ${{ github.repository_owner }}
+
+      - name: Verify report folder
+        run: |
+          pwd
+          ls -R
+          ls -R reports
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
