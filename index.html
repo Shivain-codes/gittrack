@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitTrack — Shivain-codes</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: #f6f8fa; color: #24292e; padding: 2rem; }
+        .container { max-width: 860px; margin: 0 auto; }
+        .header { background: #24292e; color: white; border-radius: 12px;
+                   padding: 2rem; margin-bottom: 1.5rem; }
+        .header h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+        .header .bio { opacity: 0.7; font-size: 0.9rem; margin-top: 0.5rem; }
+        .header .generated { opacity: 0.5; font-size: 0.8rem; margin-top: 1rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr);
+                       gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: white; border: 1px solid #e1e4e8;
+                      border-radius: 8px; padding: 1.25rem; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: 700; color: #0366d6; }
+        .stat-label { font-size: 0.8rem; color: #586069; margin-top: 0.25rem; }
+        .section { background: white; border: 1px solid #e1e4e8;
+                    border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .section h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem;
+                       padding-bottom: 0.5rem; border-bottom: 1px solid #e1e4e8; }
+        .lang-row { display: flex; align-items: center; gap: 0.75rem;
+                     margin-bottom: 0.6rem; }
+        .lang-name { width: 80px; font-size: 0.85rem; flex-shrink: 0; }
+        .lang-bar-track { flex: 1; height: 8px; background: #f1f3f5;
+                           border-radius: 99px; overflow: hidden; }
+        .lang-bar-fill { height: 100%; border-radius: 99px; }
+        .lang-pct { font-size: 0.8rem; color: #586069; width: 36px;
+                     text-align: right; }
+        .commit-list { list-style: none; }
+        .commit-list li { padding: 0.4rem 0; font-size: 0.9rem;
+                           border-bottom: 1px solid #f1f3f5; }
+        .repo-card { border: 1px solid #e1e4e8; border-radius: 6px;
+                      padding: 1rem; margin-bottom: 0.75rem; }
+        .repo-name { font-weight: 600; color: #0366d6; margin-bottom: 0.25rem; }
+        .repo-desc { font-size: 0.85rem; color: #586069; margin-bottom: 0.5rem; }
+        .repo-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: #586069; }
+        .badge { display: inline-block; background: #0366d6; color: white;
+                  font-size: 0.75rem; padding: 2px 10px; border-radius: 99px;
+                  margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div class="badge">GitTrack Report</div>
+        <h1>shivain gupta</h1>
+        <div>@Shivain-codes</div>
+        <div class="bio">Hi, I’m shivain, a passionate and purpose-driven Computer Science undergrad , currently building a strong foundation in Machine Learning</div>
+        <div class="generated">Generated automatically on April 16, 2026 at 06:17 PM</div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">24</div>
+            <div class="stat-label">Public Repos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">0</div>
+            <div class="stat-label">Commits (7 days)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">2</div>
+            <div class="stat-label">Followers</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Languages used across repos</h2>
+        
+        <div class="lang-row">
+            <span class="lang-name">Python</span>
+            <div class="lang-bar-track">
+                <div class="lang-bar-fill" style="width:50%; background:#4F86F7;"></div>
+            </div>
+            <span class="lang-pct">50%</span>
+        </div>
+        <div class="lang-row">
+            <span class="lang-name">PLpgSQL</span>
+            <div class="lang-bar-track">
+                <div class="lang-bar-fill" style="width:12%; background:#1D9E75;"></div>
+            </div>
+            <span class="lang-pct">12%</span>
+        </div>
+        <div class="lang-row">
+            <span class="lang-name">HTML</span>
+            <div class="lang-bar-track">
+                <div class="lang-bar-fill" style="width:12%; background:#E24B4A;"></div>
+            </div>
+            <span class="lang-pct">12%</span>
+        </div>
+        <div class="lang-row">
+            <span class="lang-name">Jupyter Notebook</span>
+            <div class="lang-bar-track">
+                <div class="lang-bar-fill" style="width:25%; background:#EF9F27;"></div>
+            </div>
+            <span class="lang-pct">25%</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Recent commits (last 7 days)</h2>
+        <ul class="commit-list"><li><strong>gittrack</strong> — 0 commit</li><li><strong>learning</strong> — 0 commit</li></ul>
+    </div>
+
+    <div class="section">
+        <h2>Top repositories</h2>
+        
+        <div class="repo-card">
+            <div class="repo-name">gittrack</div>
+            <div class="repo-desc">Automated GitHub activity tracker with daily reports via GitHub Actions</div>
+            <div class="repo-meta">
+                <span class="repo-lang">Python</span>
+                <span class="repo-stars">★ 0</span>
+            </div>
+        </div>
+        <div class="repo-card">
+            <div class="repo-name">learning</div>
+            <div class="repo-desc">learning of course </div>
+            <div class="repo-meta">
+                <span class="repo-lang">None</span>
+                <span class="repo-stars">★ 0</span>
+            </div>
+        </div>
+        <div class="repo-card">
+            <div class="repo-name">multi-agent-task-management-system</div>
+            <div class="repo-desc">Python multi-agent task management system with FastAPI, SQLite persistence, and a coordinator that routes requests to specialized agents for tasks, calendar, notes, and search.</div>
+            <div class="repo-meta">
+                <span class="repo-lang">Python</span>
+                <span class="repo-stars">★ 0</span>
+            </div>
+        </div>
+        <div class="repo-card">
+            <div class="repo-name">alloydb-movie-intelligence-api</div>
+            <div class="repo-desc">Movie intelligence API built with FastAPI, AlloyDB AI NL2SQL, and vector-based semantic search with real sample dataset and setup scripts.</div>
+            <div class="repo-meta">
+                <span class="repo-lang">PLpgSQL</span>
+                <span class="repo-stars">★ 0</span>
+            </div>
+        </div>
+        <div class="repo-card">
+            <div class="repo-name">adk-mcp-weather-agent</div>
+            <div class="repo-desc">AI weather agent built with Google ADK, MCP filesystem tool, and Gemini 2.0 Flash — deployed on Cloud Run</div>
+            <div class="repo-meta">
+                <span class="repo-lang">Python</span>
+                <span class="repo-stars">★ 0</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
