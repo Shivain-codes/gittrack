@@ -2,21 +2,22 @@ name: Generate Daily GitHub Activity Report
 
 on:
   schedule:
-    # GitHub Actions cron uses UTC. Runs daily at 00:00 UTC.
+    # GitHub Actions cron uses UTC. Runs daily at 00:00 UTC (5:30 AM IST).
     - cron: "0 0 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: gittrack-daily-report
+  group: gittrack-pages
   cancel-in-progress: true
 
 jobs:
   build-report:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,7 +26,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       - name: Install dependencies
         run: python -m pip install --upgrade pip requests
@@ -39,10 +39,18 @@ jobs:
           echo "Report generated successfully"
           wc -c reports/index.html
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./reports
-          publish_branch: gh-pages
-          force_orphan: true
+          path: ./reports
+
+  deploy:
+    needs: build-report
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
