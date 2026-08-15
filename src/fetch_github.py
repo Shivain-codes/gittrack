@@ -1,6 +1,6 @@
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -47,6 +47,7 @@ def analyze_activity(events, days=90):
     cutoff = now - timedelta(days=days)
     daily_commits = defaultdict(int)
     commit_repos = defaultdict(int)
+    weekday_commits = Counter()
     pull_requests = 0
     issues = 0
     issue_comments = 0
@@ -67,6 +68,7 @@ def analyze_activity(events, days=90):
             daily_commits[day] += commit_count
             if commit_count:
                 push_dates.add(event_date.date())
+                weekday_commits[event_date.strftime("%A")] += commit_count
             repo_name = event.get("repo", {}).get("name", "").split("/", 1)[-1]
             if repo_name and commit_count:
                 commit_repos[repo_name] += commit_count
@@ -87,8 +89,6 @@ def analyze_activity(events, days=90):
             if datetime.fromisoformat(day).replace(tzinfo=timezone.utc) >= period_cutoff
         )
 
-    # A streak can include yesterday. If there was no commit today yet,
-    # today's missing activity should not immediately make the streak zero.
     streak = 0
     cursor = now.date()
     if cursor not in push_dates:
@@ -110,6 +110,9 @@ def analyze_activity(events, days=90):
                 current_streak = 0
             cursor += timedelta(days=1)
 
+    most_productive_day = max(weekday_commits.items(), key=lambda item: item[1], default=("N/A", 0))
+    most_active_repo = next(iter(sorted(commit_repos.items(), key=lambda item: item[1], reverse=True)), ("N/A", 0))
+
     return {
         "daily_commits": dict(sorted(daily_commits.items())),
         "weekly_commits": total_since(7),
@@ -122,6 +125,11 @@ def analyze_activity(events, days=90):
         "pr_comments": pr_comments,
         "current_streak": streak,
         "longest_streak": longest_streak,
+        "most_productive_day": most_productive_day[0],
+        "most_productive_day_commits": most_productive_day[1],
+        "most_active_repo": most_active_repo[0],
+        "most_active_repo_commits": most_active_repo[1],
+        "average_commits_per_week": round(total_since(90) / 13, 1),
         "tracked_events": len(events),
         "tracked_since": min((event_datetime(event) for event in events if event_datetime(event)), default=None),
     }
