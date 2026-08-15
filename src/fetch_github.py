@@ -1,5 +1,6 @@
 import json
 import sys
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -14,7 +15,6 @@ MAX_EVENT_PAGES = 10
 
 
 def github_get(url, params=None):
-    """GET a GitHub API endpoint and raise a useful error on failure."""
     response = requests.get(
         url,
         headers=HEADERS,
@@ -25,60 +25,127 @@ def github_get(url, params=None):
     return response.json()
 
 
-def get_recent_activity(username, days=7):
-    """Return public push activity from the last `days` days.
-
-    GitHub returns events in reverse chronological order. We paginate until
-    events are older than the requested window or MAX_EVENT_PAGES is reached.
-    """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    recent_commits = 0
-    commit_repos = {}
-    pages_checked = 0
-
+def fetch_public_events(username):
+    """Fetch up to 1,000 recent public events for the user."""
+    events = []
     for page in range(1, MAX_EVENT_PAGES + 1):
-        events = github_get(
+        page_events = github_get(
             f"{BASE_URL}/users/{username}/events/public",
             params={"per_page": 100, "page": page},
         )
-        pages_checked += 1
-
-        if not events:
+        if not page_events:
             break
-
-        reached_cutoff = False
-
-        for event in events:
-            created_at = event.get("created_at")
-            if not created_at:
-                continue
-
-            event_date = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-
-            if event_date < cutoff:
-                reached_cutoff = True
-                break
-
-            if event.get("type") != "PushEvent":
-                continue
-
-            commits = event.get("payload", {}).get("commits") or []
-            commit_count = len(commits)
-            recent_commits += commit_count
-
-            repo_full_name = event.get("repo", {}).get("name", "")
-            repo_name = repo_full_name.split("/", 1)[-1] if repo_full_name else "Unknown"
-            commit_repos[repo_name] = commit_repos.get(repo_name, 0) + commit_count
-
-        if reached_cutoff or len(events) < 100:
+        events.extend(page_events)
+        if len(page_events) < 100:
             break
+    return events
 
-    return recent_commits, commit_repos, pages_checked
+
+def event_datetime(event):
+    value = event.get("created_at")
+    if not value:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def analyze_activity(events, days=90):
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+    daily_commits = defaultdict(int)
+    commit_repos = defaultdict(int)
+    pull_requests = 0
+    issues = 0
+    issue_comments = 0
+    pr_comments = 0
+    push_dates = set()
+
+    for event in events:
+        event_date = event_datetime(event)
+        if not event_date or event_date < cutoff:
+            continue
+
+        day = event_date.date().isoformat()
+        event_type = event.get("type")
+        payload = event.get("payload", {})
+
+        if event_type == "PushEvent":
+            commit_count = len(payload.get("commits") or [])
+            daily_commits[day] += commit_count
+            if commit_count:
+                push_dates.add(event_date.date())
+            repo_name = event.get("repo", {}).get("name", "").split("/", 1)[-1]
+            if repo_name and commit_count:
+                commit_repos[repo_name] += commit_count
+
+        elif event_type == "PullRequestEvent" and payload.get("action") in {
+            "opened",
+            "closed",
+            "reopened",
+        }:
+            pull_requests += 1
+
+        elif event_type == "IssuesEvent" and payload.get("action") in {
+            "opened",
+            "closed",
+            "reopened",
+        }:
+            issues += 1
+
+        elif event_type == "IssueCommentEvent":
+            issue_comments += 1
+
+        elif event_type == "PullRequestReviewCommentEvent":
+            pr_comments += 1
+
+    def total_since(period_days):
+        period_cutoff = now - timedelta(days=period_days)
+        return sum(
+            count
+            for day, count in daily_commits.items()
+            if datetime.fromisoformat(day).replace(tzinfo=timezone.utc) >= period_cutoff
+        )
+
+    # Calculate the current consecutive-day commit streak from the tracked data.
+    streak = 0
+    cursor = now.date()
+    while cursor in push_dates:
+        streak += 1
+        cursor -= timedelta(days=1)
+
+    longest_streak = 0
+    current_streak = 0
+    cursor = min(push_dates) if push_dates else now.date()
+    end_date = max(push_dates) if push_dates else now.date()
+    while cursor <= end_date:
+        if cursor in push_dates:
+            current_streak += 1
+            longest_streak = max(longest_streak, current_streak)
+        else:
+            current_streak = 0
+        cursor += timedelta(days=1)
+
+    return {
+        "daily_commits": dict(sorted(daily_commits.items())),
+        "weekly_commits": total_since(7),
+        "monthly_commits": total_since(30),
+        "ninety_day_commits": total_since(90),
+        "commit_repos": dict(sorted(commit_repos.items(), key=lambda item: item[1], reverse=True)),
+        "pull_requests": pull_requests,
+        "issues": issues,
+        "issue_comments": issue_comments,
+        "pr_comments": pr_comments,
+        "current_streak": streak,
+        "longest_streak": longest_streak,
+        "tracked_events": len(events),
+        "tracked_since": min(
+            (event_datetime(event) for event in events if event_datetime(event)),
+            default=None,
+        ),
+    }
 
 
 def get_user_stats(username):
     user_data = github_get(f"{BASE_URL}/users/{username}")
-
     repos_data = github_get(
         f"{BASE_URL}/users/{username}/repos",
         params={
@@ -89,16 +156,15 @@ def get_user_stats(username):
         },
     )
 
-    recent_commits, commit_repos, event_pages = get_recent_activity(username)
+    events = fetch_public_events(username)
+    activity = analyze_activity(events)
 
-    # Count repositories by their primary language.
     languages = {}
     for repo in repos_data:
         language = repo.get("language")
         if language:
             languages[language] = languages.get(language, 0) + 1
 
-    # Select the five repositories with the highest star count.
     top_repos = sorted(
         [repo for repo in repos_data if isinstance(repo, dict)],
         key=lambda repo: (
@@ -109,20 +175,21 @@ def get_user_stats(username):
         reverse=True,
     )[:5]
 
-    stats = {
+    tracked_since = activity["tracked_since"]
+    tracked_since_text = (
+        tracked_since.astimezone().strftime("%B %d, %Y") if tracked_since else "Unavailable"
+    )
+
+    return {
         "username": username,
         "name": user_data.get("name") or username,
         "bio": user_data.get("bio") or "",
         "public_repos": user_data.get("public_repos", 0),
         "followers": user_data.get("followers", 0),
         "following": user_data.get("following", 0),
-        "recent_commits": recent_commits,
-        "commit_repos": dict(
-            sorted(commit_repos.items(), key=lambda item: item[1], reverse=True)
-        ),
-        "languages": dict(
-            sorted(languages.items(), key=lambda item: item[1], reverse=True)
-        ),
+        **activity,
+        "tracked_since": tracked_since_text,
+        "languages": dict(sorted(languages.items(), key=lambda item: item[1], reverse=True)),
         "top_repos": [
             {
                 "name": repo.get("name", "Unknown"),
@@ -133,19 +200,14 @@ def get_user_stats(username):
             }
             for repo in top_repos
         ],
-        "event_pages": event_pages,
         "generated_at": datetime.now().astimezone().strftime("%B %d, %Y at %I:%M %p %Z"),
     }
-
-    return stats
 
 
 if __name__ == "__main__":
     username = sys.argv[1] if len(sys.argv) > 1 else "Shivain-codes"
-
     try:
-        stats = get_user_stats(username)
-        print(json.dumps(stats, indent=2))
+        print(json.dumps(get_user_stats(username), indent=2, default=str))
     except requests.RequestException as exc:
         print(f"GitHub API request failed: {exc}", file=sys.stderr)
         sys.exit(1)
