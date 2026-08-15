@@ -1,11 +1,11 @@
-import json
-import sys
+import html
 import os
+import sys
+
 from fetch_github import get_user_stats
 
 
 def generate_html(stats):
-    # Build language bars
     lang_html = ""
     total_repos = sum(stats["languages"].values()) or 1
     colors = ["#4F86F7", "#1D9E75", "#E24B4A", "#EF9F27", "#7F77DD", "#D85A30"]
@@ -15,42 +15,54 @@ def generate_html(stats):
         color = colors[i % len(colors)]
         lang_html += f"""
         <div class="lang-row">
-            <span class="lang-name">{lang}</span>
+            <span class="lang-name">{html.escape(lang)}</span>
             <div class="lang-bar-track">
                 <div class="lang-bar-fill" style="width:{percentage}%; background:{color};"></div>
             </div>
             <span class="lang-pct">{percentage}%</span>
         </div>"""
 
-    # Build commit repos list
-    commit_html = ""
     if stats["commit_repos"]:
-        for repo, count in sorted(stats["commit_repos"].items(),
-                                   key=lambda x: x[1], reverse=True):
-            commit_html += f'<li><strong>{repo}</strong> — {count} commit{"s" if count > 1 else ""}</li>'
+        commit_items = []
+        for repo, count in stats["commit_repos"].items():
+            suffix = "commit" if count == 1 else "commits"
+            commit_items.append(
+                f'<li><strong>{html.escape(repo)}</strong> — {count} {suffix}</li>'
+            )
+        commit_html = "".join(commit_items)
     else:
         commit_html = "<li>No commits in the last 7 days</li>"
 
-    # Build top repos
     repos_html = ""
     for repo in stats["top_repos"]:
-        desc = repo["description"] or "No description"
+        name = html.escape(repo["name"])
+        desc = html.escape(repo["description"] or "No description")
+        language = html.escape(repo["language"])
+        stars = repo["stars"]
+        forks = repo["forks"]
         repos_html += f"""
         <div class="repo-card">
-            <div class="repo-name">{repo["name"]}</div>
+            <div class="repo-name">{name}</div>
             <div class="repo-desc">{desc}</div>
             <div class="repo-meta">
-                <span class="repo-lang">{repo["language"]}</span>
-                <span class="repo-stars">★ {repo["stars"]}</span>
+                <span>{language}</span>
+                <span>★ {stars}</span>
+                <span>Forks {forks}</span>
             </div>
         </div>"""
 
-    html = f"""<!DOCTYPE html>
+    username = html.escape(stats["username"])
+    name = html.escape(stats["name"] or stats["username"])
+    bio = html.escape(stats["bio"] or "")
+    generated_at = html.escape(stats["generated_at"])
+
+    html_document = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitTrack — {stats["username"]}</title>
+    <meta name="description" content="GitTrack GitHub activity report for @{username}">
+    <title>GitTrack — @{username}</title>
     <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -59,9 +71,9 @@ def generate_html(stats):
         .header {{ background: #24292e; color: white; border-radius: 12px;
                    padding: 2rem; margin-bottom: 1.5rem; }}
         .header h1 {{ font-size: 1.8rem; margin-bottom: 0.25rem; }}
-        .header .bio {{ opacity: 0.7; font-size: 0.9rem; margin-top: 0.5rem; }}
+        .header .bio {{ opacity: 0.7; font-size: 0.9rem; margin-top: 0.5rem; line-height: 1.5; }}
         .header .generated {{ opacity: 0.5; font-size: 0.8rem; margin-top: 1rem; }}
-        .stats-grid {{ display: grid; grid-template-columns: repeat(3, 1fr);
+        .stats-grid {{ display: grid; grid-template-columns: repeat(4, 1fr);
                        gap: 1rem; margin-bottom: 1.5rem; }}
         .stat-card {{ background: white; border: 1px solid #e1e4e8;
                       border-radius: 8px; padding: 1.25rem; text-align: center; }}
@@ -73,7 +85,7 @@ def generate_html(stats):
                        padding-bottom: 0.5rem; border-bottom: 1px solid #e1e4e8; }}
         .lang-row {{ display: flex; align-items: center; gap: 0.75rem;
                      margin-bottom: 0.6rem; }}
-        .lang-name {{ width: 80px; font-size: 0.85rem; flex-shrink: 0; }}
+        .lang-name {{ width: 100px; font-size: 0.85rem; flex-shrink: 0; }}
         .lang-bar-track {{ flex: 1; height: 8px; background: #f1f3f5;
                            border-radius: 99px; overflow: hidden; }}
         .lang-bar-fill {{ height: 100%; border-radius: 99px; }}
@@ -84,23 +96,29 @@ def generate_html(stats):
                            border-bottom: 1px solid #f1f3f5; }}
         .repo-card {{ border: 1px solid #e1e4e8; border-radius: 6px;
                       padding: 1rem; margin-bottom: 0.75rem; }}
+        .repo-card:last-child {{ margin-bottom: 0; }}
         .repo-name {{ font-weight: 600; color: #0366d6; margin-bottom: 0.25rem; }}
-        .repo-desc {{ font-size: 0.85rem; color: #586069; margin-bottom: 0.5rem; }}
+        .repo-desc {{ font-size: 0.85rem; color: #586069; margin-bottom: 0.5rem; line-height: 1.4; }}
         .repo-meta {{ display: flex; gap: 1rem; font-size: 0.8rem; color: #586069; }}
         .badge {{ display: inline-block; background: #0366d6; color: white;
                   font-size: 0.75rem; padding: 2px 10px; border-radius: 99px;
                   margin-bottom: 0.5rem; }}
+        .footer {{ text-align: center; color: #586069; font-size: 0.75rem; margin-top: 1rem; }}
+        @media (max-width: 650px) {{
+            body {{ padding: 1rem; }}
+            .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
+            .repo-meta {{ flex-wrap: wrap; gap: 0.5rem 1rem; }}
+        }}
     </style>
 </head>
 <body>
 <div class="container">
-
     <div class="header">
         <div class="badge">GitTrack Report</div>
-        <h1>{stats["name"] or stats["username"]}</h1>
-        <div>@{stats["username"]}</div>
-        <div class="bio">{stats["bio"] or ""}</div>
-        <div class="generated">Generated automatically on {stats["generated_at"]}</div>
+        <h1>{name}</h1>
+        <div>@{username}</div>
+        <div class="bio">{bio}</div>
+        <div class="generated">Generated automatically on {generated_at}</div>
     </div>
 
     <div class="stats-grid">
@@ -116,39 +134,49 @@ def generate_html(stats):
             <div class="stat-number">{stats["followers"]}</div>
             <div class="stat-label">Followers</div>
         </div>
+        <div class="stat-card">
+            <div class="stat-number">{stats["following"]}</div>
+            <div class="stat-label">Following</div>
+        </div>
     </div>
 
     <div class="section">
-        <h2>Languages used across repos</h2>
+        <h2>Languages across repositories</h2>
         {lang_html or "<p style='color:#586069;font-size:0.9rem;'>No language data available</p>"}
     </div>
 
     <div class="section">
-        <h2>Recent commits (last 7 days)</h2>
+        <h2>Recent commits — last 7 days</h2>
         <ul class="commit-list">{commit_html}</ul>
     </div>
 
     <div class="section">
-        <h2>Top repositories</h2>
+        <h2>Top repositories by stars</h2>
         {repos_html or "<p style='color:#586069;font-size:0.9rem;'>No repositories found</p>"}
     </div>
 
+    <div class="footer">GitTrack • Generated by GitHub Actions</div>
 </div>
 </body>
 </html>"""
 
-    return html
+    return html_document
 
 
 if __name__ == "__main__":
-    username = sys.argv[1] if len(sys.argv) > 1 else "shivain-gupta-827772346"
+    username = sys.argv[1] if len(sys.argv) > 1 else "Shivain-codes"
     print(f"Fetching stats for {username}...", file=sys.stderr)
-    stats = get_user_stats(username)
-    html = generate_html(stats)
 
-    os.makedirs("reports", exist_ok=True)
-    output_path = "reports/index.html"
-    with open(output_path, "w") as f:
-        f.write(html)
+    try:
+        stats = get_user_stats(username)
+        html_document = generate_html(stats)
 
-    print(f"Report generated: {output_path}", file=sys.stderr)
+        os.makedirs("reports", exist_ok=True)
+        output_path = "reports/index.html"
+        with open(output_path, "w", encoding="utf-8") as file:
+            file.write(html_document)
+
+        print(f"Report generated: {output_path}", file=sys.stderr)
+    except Exception as exc:
+        print(f"Report generation failed: {exc}", file=sys.stderr)
+        sys.exit(1)
