@@ -15,18 +15,12 @@ MAX_EVENT_PAGES = 10
 
 
 def github_get(url, params=None):
-    response = requests.get(
-        url,
-        headers=HEADERS,
-        params=params,
-        timeout=REQUEST_TIMEOUT,
-    )
+    response = requests.get(url, headers=HEADERS, params=params, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
 
 
 def fetch_public_events(username):
-    """Fetch up to 1,000 recent public events for the user."""
     events = []
     for page in range(1, MAX_EVENT_PAGES + 1):
         page_events = github_get(
@@ -76,24 +70,12 @@ def analyze_activity(events, days=90):
             repo_name = event.get("repo", {}).get("name", "").split("/", 1)[-1]
             if repo_name and commit_count:
                 commit_repos[repo_name] += commit_count
-
-        elif event_type == "PullRequestEvent" and payload.get("action") in {
-            "opened",
-            "closed",
-            "reopened",
-        }:
+        elif event_type == "PullRequestEvent" and payload.get("action") in {"opened", "closed", "reopened"}:
             pull_requests += 1
-
-        elif event_type == "IssuesEvent" and payload.get("action") in {
-            "opened",
-            "closed",
-            "reopened",
-        }:
+        elif event_type == "IssuesEvent" and payload.get("action") in {"opened", "closed", "reopened"}:
             issues += 1
-
         elif event_type == "IssueCommentEvent":
             issue_comments += 1
-
         elif event_type == "PullRequestReviewCommentEvent":
             pr_comments += 1
 
@@ -105,24 +87,28 @@ def analyze_activity(events, days=90):
             if datetime.fromisoformat(day).replace(tzinfo=timezone.utc) >= period_cutoff
         )
 
-    # Calculate the current consecutive-day commit streak from the tracked data.
+    # A streak can include yesterday. If there was no commit today yet,
+    # today's missing activity should not immediately make the streak zero.
     streak = 0
     cursor = now.date()
+    if cursor not in push_dates:
+        cursor -= timedelta(days=1)
     while cursor in push_dates:
         streak += 1
         cursor -= timedelta(days=1)
 
     longest_streak = 0
     current_streak = 0
-    cursor = min(push_dates) if push_dates else now.date()
-    end_date = max(push_dates) if push_dates else now.date()
-    while cursor <= end_date:
-        if cursor in push_dates:
-            current_streak += 1
-            longest_streak = max(longest_streak, current_streak)
-        else:
-            current_streak = 0
-        cursor += timedelta(days=1)
+    if push_dates:
+        cursor = min(push_dates)
+        end_date = max(push_dates)
+        while cursor <= end_date:
+            if cursor in push_dates:
+                current_streak += 1
+                longest_streak = max(longest_streak, current_streak)
+            else:
+                current_streak = 0
+            cursor += timedelta(days=1)
 
     return {
         "daily_commits": dict(sorted(daily_commits.items())),
@@ -137,10 +123,7 @@ def analyze_activity(events, days=90):
         "current_streak": streak,
         "longest_streak": longest_streak,
         "tracked_events": len(events),
-        "tracked_since": min(
-            (event_datetime(event) for event in events if event_datetime(event)),
-            default=None,
-        ),
+        "tracked_since": min((event_datetime(event) for event in events if event_datetime(event)), default=None),
     }
 
 
@@ -148,12 +131,7 @@ def get_user_stats(username):
     user_data = github_get(f"{BASE_URL}/users/{username}")
     repos_data = github_get(
         f"{BASE_URL}/users/{username}/repos",
-        params={
-            "sort": "updated",
-            "direction": "desc",
-            "per_page": 100,
-            "type": "owner",
-        },
+        params={"sort": "updated", "direction": "desc", "per_page": 100, "type": "owner"},
     )
 
     events = fetch_public_events(username)
@@ -176,9 +154,7 @@ def get_user_stats(username):
     )[:5]
 
     tracked_since = activity["tracked_since"]
-    tracked_since_text = (
-        tracked_since.astimezone().strftime("%B %d, %Y") if tracked_since else "Unavailable"
-    )
+    tracked_since_text = tracked_since.astimezone().strftime("%B %d, %Y") if tracked_since else "Unavailable"
 
     return {
         "username": username,
